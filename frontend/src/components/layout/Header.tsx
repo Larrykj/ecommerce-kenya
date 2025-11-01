@@ -1,18 +1,36 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { FiShoppingCart, FiUser, FiSearch, FiMenu, FiGlobe } from 'react-icons/fi'
+import { useRouter } from 'next/navigation'
+import { FiShoppingCart, FiUser, FiSearch, FiMenu, FiGlobe, FiLogIn, FiLogOut } from 'react-icons/fi'
 import { useCartStore } from '@/store/cartStore'
 import { useLanguageStore } from '@/store/languageStore'
+import { useUserStore } from '@/store/userStore'
 
 export default function Header() {
+  const router = useRouter()
   const [searchQuery, setSearchQuery] = useState('')
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const { items } = useCartStore()
   const { language, toggleLanguage } = useLanguageStore()
+  const { user, logout } = useUserStore()
+  
+  // Check if user is logged in
+  useEffect(() => {
+    const token = localStorage.getItem('auth_token')
+    if (!token && user) {
+      logout()
+    }
+  }, [user, logout])
   
   const cartItemCount = items.reduce((sum, item) => sum + item.quantity, 0)
+
+  const handleLogout = () => {
+    localStorage.removeItem('auth_token')
+    logout()
+    router.push('/')
+  }
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -77,10 +95,25 @@ export default function Header() {
               )}
             </Link>
 
-            {/* User Account */}
-            <Link href="/account" className="text-gray-600 hover:text-primary-600">
-              <FiUser size={24} />
-            </Link>
+            {/* User Account / Login */}
+            {user ? (
+              <>
+                <Link href="/account" className="text-gray-600 hover:text-primary-600" title={user.name || user.email}>
+                  <FiUser size={24} />
+                </Link>
+                <button
+                  onClick={handleLogout}
+                  className="text-gray-600 hover:text-primary-600"
+                  title="Logout"
+                >
+                  <FiLogOut size={20} />
+                </button>
+              </>
+            ) : (
+              <Link href="/login" className="text-gray-600 hover:text-primary-600" title="Login">
+                <FiLogIn size={24} />
+              </Link>
+            )}
 
             {/* Mobile Menu Toggle */}
             <button

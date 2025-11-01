@@ -2,11 +2,18 @@
 Redis Caching Service
 For fast access to recommendations and trending items
 """
-import redis
 import json
 from typing import Optional, List, Dict, Any
-from datetime import timedelta
+from datetime import timedelta, datetime
 from app.core.config import settings
+
+# Optional Redis import
+try:
+    import redis
+    REDIS_AVAILABLE = True
+except ImportError:
+    REDIS_AVAILABLE = False
+    print("⚠️  Redis not available - caching disabled")
 
 
 class RedisService:
@@ -18,6 +25,11 @@ class RedisService:
     
     def connect(self):
         """Connect to Redis"""
+        if not REDIS_AVAILABLE:
+            print("[WARNING] Redis package not installed - caching disabled")
+            self.redis_client = None
+            return
+            
         try:
             self.redis_client = redis.from_url(
                 settings.REDIS_URL,
@@ -27,9 +39,10 @@ class RedisService:
             )
             # Test connection
             self.redis_client.ping()
-            print("✅ Connected to Redis")
+            print("[SUCCESS] Connected to Redis")
         except Exception as e:
-            print(f"⚠️  Redis connection failed: {e}")
+            print(f"[WARNING] Redis connection failed: {e}")
+            print("   App will run without caching")
             self.redis_client = None
     
     def is_connected(self) -> bool:
@@ -179,7 +192,7 @@ class RedisService:
     
     async def increment_view_count(self, product_id: str) -> int:
         """Increment product view count"""
-        if not self.is_connected():
+        if not self.is_connected() or not REDIS_AVAILABLE:
             return 0
         
         try:
@@ -199,7 +212,7 @@ class RedisService:
         language: str = "en"
     ):
         """Add search query to suggestions"""
-        if not self.is_connected():
+        if not self.is_connected() or not REDIS_AVAILABLE:
             return
         
         try:
@@ -218,7 +231,7 @@ class RedisService:
         limit: int = 5
     ) -> List[str]:
         """Get search suggestions"""
-        if not self.is_connected():
+        if not self.is_connected() or not REDIS_AVAILABLE:
             return []
         
         try:
@@ -241,7 +254,7 @@ class RedisService:
         product_id: Optional[str] = None
     ):
         """Track user activity in real-time"""
-        if not self.is_connected():
+        if not self.is_connected() or not REDIS_AVAILABLE:
             return
         
         try:

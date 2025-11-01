@@ -5,6 +5,8 @@ from fastapi import APIRouter, HTTPException, Query
 from typing import Optional, List
 from app.schemas.product import ProductResponse, ProductListResponse
 from app.services.redis_service import redis_service
+from app.data.mock_database import mock_db
+from datetime import datetime
 
 router = APIRouter()
 
@@ -30,16 +32,68 @@ async def list_products(
     - Search
     - Bilingual display (English/Swahili)
     """
-    # In production, query MongoDB with filters
-    # Mock response
-    return ProductListResponse(
-        products=[],
-        total=0,
-        page=page,
-        page_size=page_size,
-        has_next=False,
-        has_prev=False
-    )
+    try:
+        offset = (page - 1) * page_size
+        products = mock_db.get_products(
+            category=category,
+            county=county,
+            search=search,
+            min_price=min_price,
+            max_price=max_price,
+            limit=page_size,
+            offset=offset
+        )
+        
+        # Convert to response format
+        product_responses = []
+        for p in products:
+            product_responses.append(ProductResponse(
+                id=p["id"],
+                name=p["name"] if language == "en" else p.get("name_sw", p["name"]),
+                name_sw=p.get("name_sw", p["name"]),
+                description=p["description"] if language == "en" else p.get("description_sw", p["description"]),
+                description_sw=p.get("description_sw", p["description"]),
+                category=p["category"],
+                brand=p.get("vendor_name", ""),
+                tags=p.get("tags", []),
+                price=p["price"],
+                currency=p.get("currency", "KES"),
+                stock_quantity=p.get("stock", 0),
+                discount_percentage=0,
+                in_stock=p.get("stock", 0) > 0,
+                images=p.get("images", []),
+                thumbnail=p.get("images", [""])[0] if p.get("images") else None,
+                average_rating=p.get("rating", 0.0),
+                review_count=p.get("review_count", 0),
+                view_count=0,
+                purchase_count=0,
+                is_featured=False,
+                is_local_vendor=True,
+                created_at=datetime.fromisoformat(p["created_at"].replace("Z", "+00:00"))
+            ))
+        
+        # Get total count for pagination
+        all_products = mock_db.get_products(
+            category=category,
+            county=county,
+            search=search,
+            min_price=min_price,
+            max_price=max_price,
+            limit=10000,
+            offset=0
+        )
+        total = len(all_products)
+        
+        return ProductListResponse(
+            products=product_responses,
+            total=total,
+            page=page,
+            page_size=page_size,
+            has_next=(offset + page_size) < total,
+            has_prev=page > 1
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/{product_id}", response_model=ProductResponse)
@@ -52,36 +106,44 @@ async def get_product(
     
     Returns product details in the specified language
     """
-    # Track view
-    await redis_service.increment_view_count(product_id)
-    
-    # In production, fetch from MongoDB
-    # Mock response
-    from datetime import datetime
-    return ProductResponse(
-        id=product_id,
-        name="Sample Product",
-        name_sw="Bidhaa ya Sampuli",
-        description="A great product",
-        description_sw="Bidhaa nzuri",
-        category="Electronics",
-        brand="TechBrand",
-        tags=["smartphone", "android"],
-        price=25000,
-        currency="KES",
-        stock_quantity=50,
-        discount_percentage=0,
-        in_stock=True,
-        images=[],
-        thumbnail=None,
-        average_rating=4.5,
-        review_count=120,
-        view_count=1500,
-        purchase_count=230,
-        is_featured=False,
-        is_local_vendor=True,
-        created_at=datetime.utcnow()
-    )
+    try:
+        # Track view
+        await redis_service.increment_view_count(product_id)
+        
+        # Get product from mock database
+        product = mock_db.get_product_by_id(product_id)
+        
+        if not product:
+            raise HTTPException(status_code=404, detail="Product not found")
+        
+        return ProductResponse(
+            id=product["id"],
+            name=product["name"] if language == "en" else product.get("name_sw", product["name"]),
+            name_sw=product.get("name_sw", product["name"]),
+            description=product["description"] if language == "en" else product.get("description_sw", product["description"]),
+            description_sw=product.get("description_sw", product["description"]),
+            category=product["category"],
+            brand=product.get("vendor_name", ""),
+            tags=product.get("tags", []),
+            price=product["price"],
+            currency=product.get("currency", "KES"),
+            stock_quantity=product.get("stock", 0),
+            discount_percentage=0,
+            in_stock=product.get("stock", 0) > 0,
+            images=product.get("images", []),
+            thumbnail=product.get("images", [""])[0] if product.get("images") else None,
+            average_rating=product.get("rating", 0.0),
+            review_count=product.get("review_count", 0),
+            view_count=0,
+            purchase_count=0,
+            is_featured=False,
+            is_local_vendor=True,
+            created_at=datetime.fromisoformat(product["created_at"].replace("Z", "+00:00"))
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/categories/list")
@@ -114,6 +176,9 @@ async def list_local_vendors(
     
     Promotes local businesses. Can filter by county.
     """
-    # In production, query vendors from database
-    return {"vendors": []}
+    try:
+        vendors = mock_db.get_vendors(county=county)
+        return {"vendors": vendors}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 

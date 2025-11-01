@@ -13,6 +13,8 @@ from app.schemas.recommendation import (
 from app.schemas.product import ProductResponse
 from app.services.recommendation_service import recommendation_service
 from app.services.redis_service import redis_service
+from app.data.mock_database import mock_db
+from datetime import datetime
 
 router = APIRouter()
 
@@ -33,41 +35,69 @@ async def get_personalized_recommendations(
     - **matrix_factorization**: SVD-based latent feature model
     """
     try:
-        # Check cache first
-        cached_recs = await redis_service.get_user_recommendations(user_id, algorithm)
-        if cached_recs:
-            return RecommendationResponse(
-                products=[],  # Would need to fetch full product details
-                algorithm_used=algorithm,
-                explanation="Personalized recommendations based on your activity"
+        # Get user interactions to understand preferences
+        interactions = mock_db.get_user_interactions(user_id)
+        user = mock_db.get_user_by_id(user_id)
+        
+        # Get user preferred categories
+        preferred_categories = user.get("preferred_categories", []) if user else []
+        
+        # Get recommendations from ML service (fallback to mock if not available)
+        try:
+            recommendations = await recommendation_service.get_personalized_recommendations(
+                user_id=user_id,
+                n_recommendations=limit,
+                algorithm=algorithm
             )
+        except:
+            recommendations = None
         
-        # Get recommendations from ML service
-        recommendations = await recommendation_service.get_personalized_recommendations(
-            user_id=user_id,
-            n_recommendations=limit,
-            algorithm=algorithm
-        )
-        
+        # If ML service not available, use simple recommendation based on preferences
         if not recommendations:
-            raise HTTPException(
-                status_code=404,
-                detail="No recommendations available. User may need more interaction history."
-            )
+            # Filter products by user's preferred categories or get trending
+            if preferred_categories:
+                products = mock_db.get_products(category=preferred_categories[0], limit=limit)
+            else:
+                products = mock_db.get_trending_products(limit=limit)
+        else:
+            # Map recommendation IDs to products
+            product_ids = [r.get('product_id', '') for r in recommendations if isinstance(r, dict)]
+            products = [mock_db.get_product_by_id(pid) for pid in product_ids if pid]
+            products = [p for p in products if p]  # Remove None values
         
-        # Cache results
-        await redis_service.cache_user_recommendations(
-            user_id, recommendations, algorithm
-        )
-        
-        # Track view
-        await redis_service.track_user_activity(user_id, "view_recommendations")
+        # Convert to ProductResponse format
+        product_responses = []
+        for p in products[:limit]:
+            if p:
+                product_responses.append(ProductResponse(
+                    id=p["id"],
+                    name=p["name"],
+                    name_sw=p.get("name_sw", p["name"]),
+                    description=p["description"],
+                    description_sw=p.get("description_sw", p["description"]),
+                    category=p["category"],
+                    brand=p.get("vendor_name", ""),
+                    tags=p.get("tags", []),
+                    price=p["price"],
+                    currency=p.get("currency", "KES"),
+                    stock_quantity=p.get("stock", 0),
+                    discount_percentage=0,
+                    in_stock=p.get("stock", 0) > 0,
+                    images=p.get("images", []),
+                    thumbnail=p.get("images", [""])[0] if p.get("images") else None,
+                    average_rating=p.get("rating", 0.0),
+                    review_count=p.get("review_count", 0),
+                    view_count=0,
+                    purchase_count=0,
+                    is_featured=False,
+                    is_local_vendor=True,
+                    created_at=datetime.fromisoformat(p["created_at"].replace("Z", "+00:00"))
+                ))
         
         return RecommendationResponse(
-            products=[],  # Would fetch full product details from DB
-            algorithm_used=algorithm,
-            confidence_scores=[r['score'] for r in recommendations],
-            explanation=f"These recommendations were generated using {algorithm} algorithm based on your browsing and purchase history."
+            products=product_responses,
+            algorithm_used=algorithm if recommendations else "preference_based",
+            explanation=f"Personalized recommendations based on your preferences and activity"
         )
     
     except Exception as e:
@@ -122,51 +152,54 @@ async def get_similar_products(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/trending", response_model=RecommendationResponse)
+@router.get("/trending", response_model=RecommendationResponse)
 async def get_trending_products(
-    time_window: str = Query("24h", description="Time window: 1h, 24h, 7d, 30d"),
     county: Optional[str] = Query(None, description="Filter by county"),
-    category: Optional[str] = Query(None, description="Filter by category"),
     limit: int = Query(10, ge=1, le=50)
 ):
     """
     Get trending products based on recent user activity
     
-    Supports regional filtering (county-based) and category filtering
+    Supports regional filtering (county-based)
     """
     try:
-        # Check cache
-        cached_trending = await redis_service.get_trending_products(
-            category, county, time_window
-        )
-        if cached_trending:
-            return RecommendationResponse(
-                products=[],
-                algorithm_used="trending",
-                explanation=f"Trending products in the last {time_window}"
-            )
+        # Get trending products from mock database
+        products = mock_db.get_trending_products(county=county, limit=limit)
         
-        # Get trending products (would need actual interactions from DB)
-        trending = await recommendation_service.get_trending_products(
-            interactions=[],  # Would fetch from database
-            time_window=time_window,
-            county=county,
-            category=category,
-            n_items=limit
-        )
-        
-        # Cache results (shorter TTL for trending)
-        await redis_service.cache_trending_products(
-            trending, category, county, time_window
-        )
+        # Convert to ProductResponse format
+        product_responses = []
+        for p in products:
+            product_responses.append(ProductResponse(
+                id=p["id"],
+                name=p["name"],
+                name_sw=p.get("name_sw", p["name"]),
+                description=p["description"],
+                description_sw=p.get("description_sw", p["description"]),
+                category=p["category"],
+                brand=p.get("vendor_name", ""),
+                tags=p.get("tags", []),
+                price=p["price"],
+                currency=p.get("currency", "KES"),
+                stock_quantity=p.get("stock", 0),
+                discount_percentage=0,
+                in_stock=p.get("stock", 0) > 0,
+                images=p.get("images", []),
+                thumbnail=p.get("images", [""])[0] if p.get("images") else None,
+                average_rating=p.get("rating", 0.0),
+                review_count=p.get("review_count", 0),
+                view_count=0,
+                purchase_count=0,
+                is_featured=False,
+                is_local_vendor=True,
+                created_at=datetime.fromisoformat(p["created_at"].replace("Z", "+00:00"))
+            ))
         
         county_text = f" in {county}" if county else " nationwide"
-        category_text = f" in {category}" if category else ""
         
         return RecommendationResponse(
-            products=[],
+            products=product_responses,
             algorithm_used="trending",
-            explanation=f"Most popular products{county_text}{category_text} in the last {time_window}"
+            explanation=f"Most popular products{county_text} based on ratings and reviews"
         )
     
     except Exception as e:

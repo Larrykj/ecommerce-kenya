@@ -1,20 +1,20 @@
 # Core Framework
-fastapi==0.109.0
-uvicorn[standard]==0.27.0
-pydantic==2.5.3
-pydantic-settings==2.1.0
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
 
-# Database Drivers
-motor==3.3.2
-pymongo==4.6.1
-redis==5.0.1
+# Database Drivers (optional - app will work without them)
+motor>=3.3.0
+pymongo>=4.6.0
+redis>=5.0.0
 
-# Machine Learning & Data Science
-scikit-learn==1.4.0
-lightfm==1.17
-pandas==2.1.4
-numpy==1.26.3
-scipy==1.11.4
+# Machine Learning & Data Science (using pre-built wheels)
+scikit-learn>=1.3.0
+pandas>=2.0.0
+numpy>=1.24.0
+# scipy>=1.11.0  # Optional - only if needed
+# lightfm>=1.17  # Optional - requires C++ compiler
 
 # Authentication & Security
 python-jose[cryptography]==3.3.0
@@ -46,8 +46,8 @@ prometheus-fastapi-instrumentator==6.1.0
 # pytest-asyncio==0.23.2
 # pytest-cov==4.1.0
 
-# Image Processing
-Pillow==10.2.0
+# Image Processing (optional)
+# Pillow==10.2.0  # Disabled - optional dependency
 
 # Caching
 aiocache==0.12.2

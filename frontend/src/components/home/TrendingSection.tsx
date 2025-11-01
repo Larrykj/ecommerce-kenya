@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import ProductCard from '../products/ProductCard'
 import { useLanguageStore } from '@/store/languageStore'
+import { recommendationsAPI } from '@/services/api'
 
 interface TrendingSectionProps {
   county: string
@@ -16,12 +17,24 @@ export default function TrendingSection({ county, title, titleEn }: TrendingSect
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Fetch trending products from API
-    // For now, mock data
-    setTimeout(() => {
-      setProducts([])
-      setLoading(false)
-    }, 1000)
+    const fetchTrending = async () => {
+      try {
+        setLoading(true)
+        const response = await recommendationsAPI.getTrending({ 
+          county: county || undefined, 
+          limit: 10 
+        })
+        if (response.data?.products) {
+          setProducts(response.data.products)
+        }
+      } catch (error) {
+        console.error('Failed to fetch trending products:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchTrending()
   }, [county])
 
   return (

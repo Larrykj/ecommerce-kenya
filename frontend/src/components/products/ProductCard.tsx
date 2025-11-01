@@ -45,9 +45,10 @@ export default function ProductCard({ product }: ProductCardProps) {
   const displayName = isSwahili && product.name_sw ? product.name_sw : product.name
 
   return (
-    <Link href={`/products/${product.id}`} className="card overflow-hidden group">
+    <div className="card overflow-hidden group relative">
       {/* Image */}
-      <div className="relative aspect-square bg-gray-100">
+      <Link href={`/products/${product.id}`}>
+      <div className="relative aspect-square bg-gray-100 cursor-pointer">
         {product.image ? (
           <img 
             src={product.image} 
@@ -85,12 +86,15 @@ export default function ProductCard({ product }: ProductCardProps) {
           <FiHeart size={18} />
         </button>
       </div>
+      </Link>
 
       {/* Content */}
       <div className="p-4">
-        <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2 text-sm">
+        <Link href={`/products/${product.id}`}>
+        <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2 text-sm hover:text-green-600 cursor-pointer">
           {displayName}
         </h3>
+        </Link>
 
         {/* Rating */}
         {product.average_rating && (
@@ -121,7 +125,7 @@ export default function ProductCard({ product }: ProductCardProps) {
           {isSwahili ? 'Ongeza' : 'Add to Cart'}
         </button>
       </div>
-    </Link>
+    </div>
   )
 }
 

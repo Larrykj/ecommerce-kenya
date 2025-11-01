@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import ProductCard from '../products/ProductCard'
 import { useLanguageStore } from '@/store/languageStore'
+import { recommendationsAPI } from '@/services/api'
 
 interface RecommendationsSectionProps {
   userId?: string
@@ -27,12 +28,38 @@ export default function RecommendationsSection({
       return
     }
 
-    // Fetch recommendations from API
-    // Mock for now
-    setTimeout(() => {
-      setRecommendations([])
-      setLoading(false)
-    }, 1000)
+    const fetchRecommendations = async () => {
+      try {
+        setLoading(true)
+        let response
+        
+        if (contextAware) {
+          // Use context-aware recommendations
+          const timeOfDay = new Date().getHours() < 12 ? 'morning' : 
+                           new Date().getHours() < 18 ? 'afternoon' : 'evening'
+          response = await recommendationsAPI.getContextAware(userId, {
+            time_of_day: timeOfDay,
+            limit: 10
+          })
+        } else {
+          // Use personalized recommendations
+          response = await recommendationsAPI.getPersonalized(userId, {
+            limit: 10,
+            algorithm: 'hybrid'
+          })
+        }
+        
+        if (response.data?.products) {
+          setRecommendations(response.data.products)
+        }
+      } catch (error) {
+        console.error('Failed to fetch recommendations:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchRecommendations()
   }, [userId, contextAware])
 
   if (!userId) {

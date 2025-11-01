@@ -61,7 +61,7 @@ export const recommendationsAPI = {
   getSimilar: (productId: string, params: any) =>
     api.get(`/recommendations/similar/${productId}`, { params }),
   getTrending: (params: any) =>
-    api.post('/recommendations/trending', null, { params }),
+    api.get('/recommendations/trending', { params }),
   getBundle: (productIds: string[]) =>
     api.get('/recommendations/bundle', { params: { product_ids: productIds } }),
   getContextAware: (userId: string, context: any) =>

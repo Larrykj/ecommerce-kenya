@@ -5,10 +5,29 @@ Orchestrates all ML models and provides unified recommendation interface
 from typing import List, Dict, Optional, Tuple
 from datetime import datetime, timedelta
 import asyncio
-from app.ml.collaborative_filtering import CollaborativeFilteringEngine
-from app.ml.matrix_factorization import MatrixFactorizationEngine
-from app.ml.hybrid_model import HybridRecommendationEngine
 from app.core.config import settings
+
+# Optional ML imports
+try:
+    from app.ml.collaborative_filtering import CollaborativeFilteringEngine
+    CF_AVAILABLE = True
+except ImportError as e:
+    CF_AVAILABLE = False
+    print(f"[WARNING] Collaborative filtering not available: {e}")
+
+try:
+    from app.ml.matrix_factorization import MatrixFactorizationEngine
+    MF_AVAILABLE = True
+except ImportError as e:
+    MF_AVAILABLE = False
+    print(f"[WARNING] Matrix factorization not available: {e}")
+
+try:
+    from app.ml.hybrid_model import HybridRecommendationEngine
+    HYBRID_AVAILABLE = True
+except ImportError as e:
+    HYBRID_AVAILABLE = False
+    print(f"[WARNING] Hybrid model not available: {e}")
 
 
 class RecommendationService:
@@ -17,16 +36,22 @@ class RecommendationService:
     """
     
     def __init__(self):
+        # Initialize engines only if available
         self.cf_engine = CollaborativeFilteringEngine(
             n_neighbors=settings.KNN_NEIGHBORS
-        )
+        ) if CF_AVAILABLE else None
+        
         self.mf_engine = MatrixFactorizationEngine(
             n_factors=settings.SVD_FACTORS
-        )
-        self.hybrid_engine = HybridRecommendationEngine()
+        ) if MF_AVAILABLE else None
+        
+        self.hybrid_engine = HybridRecommendationEngine() if HYBRID_AVAILABLE else None
         
         self.models_trained = False
         self.last_training = None
+        
+        if not any([CF_AVAILABLE, MF_AVAILABLE, HYBRID_AVAILABLE]):
+            print("[WARNING] No ML models available - using mock recommendations")
     
     async def train_models(
         self, 
@@ -82,26 +107,30 @@ class RecommendationService:
         Returns:
             List of recommended products with scores
         """
+        # Return mock recommendations if no models available
+        if not any([CF_AVAILABLE, MF_AVAILABLE, HYBRID_AVAILABLE]):
+            return self._get_mock_recommendations(user_id, n_recommendations)
+        
         if not self.models_trained:
-            return []
+            return self._get_mock_recommendations(user_id, n_recommendations)
         
         try:
-            if algorithm == "user_based":
+            if algorithm == "user_based" and self.cf_engine:
                 recommendations = self.cf_engine.recommend_user_based(
                     user_id, n_recommendations
                 )
-            elif algorithm == "item_based":
-                # Get user's last viewed/purchased items
-                # For now, return empty as we need user context
+            elif algorithm == "item_based" and self.cf_engine:
                 recommendations = []
-            elif algorithm == "matrix_factorization":
+            elif algorithm == "matrix_factorization" and self.mf_engine:
                 recommendations = self.mf_engine.recommend(
                     user_id, n_recommendations
                 )
-            else:  # hybrid (default)
+            elif algorithm == "hybrid" and self.hybrid_engine:
                 recommendations = self.hybrid_engine.recommend(
                     user_id, n_recommendations
                 )
+            else:
+                return self._get_mock_recommendations(user_id, n_recommendations)
             
             return [
                 {"product_id": pid, "score": score, "algorithm": algorithm}
@@ -110,7 +139,20 @@ class RecommendationService:
         
         except Exception as e:
             print(f"Error generating recommendations: {e}")
-            return []
+            return self._get_mock_recommendations(user_id, n_recommendations)
+    
+    def _get_mock_recommendations(self, user_id: str, n: int) -> List[Dict]:
+        """Generate mock recommendations for testing"""
+        return [
+            {
+                "product_id": f"mock_product_{i}",
+                "score": 0.9 - (i * 0.1),
+                "algorithm": "mock",
+                "name": f"Sample Product {i+1}",
+                "price": 1000 + (i * 500)
+            }
+            for i in range(min(n, 10))
+        ]
     
     async def get_similar_products(
         self,
@@ -129,22 +171,27 @@ class RecommendationService:
         Returns:
             List of similar products with similarity scores
         """
+        if not any([CF_AVAILABLE, MF_AVAILABLE, HYBRID_AVAILABLE]):
+            return self._get_mock_similar_products(product_id, n_similar)
+            
         if not self.models_trained:
-            return []
+            return self._get_mock_similar_products(product_id, n_similar)
         
         try:
-            if algorithm == "item_based":
+            if algorithm == "item_based" and self.cf_engine:
                 similar_products = self.cf_engine.recommend_item_based(
                     product_id, n_similar
                 )
-            elif algorithm == "matrix_factorization":
+            elif algorithm == "matrix_factorization" and self.mf_engine:
                 similar_products = self.mf_engine.get_similar_items(
                     product_id, n_similar
                 )
-            else:  # hybrid
+            elif algorithm == "hybrid" and self.hybrid_engine:
                 similar_products = self.hybrid_engine.recommend_similar_items(
                     product_id, n_similar
                 )
+            else:
+                return self._get_mock_similar_products(product_id, n_similar)
             
             return [
                 {"product_id": pid, "similarity": score, "algorithm": algorithm}
@@ -153,7 +200,19 @@ class RecommendationService:
         
         except Exception as e:
             print(f"Error finding similar products: {e}")
-            return []
+            return self._get_mock_similar_products(product_id, n_similar)
+    
+    def _get_mock_similar_products(self, product_id: str, n: int) -> List[Dict]:
+        """Generate mock similar products for testing"""
+        return [
+            {
+                "product_id": f"similar_{product_id}_{i}",
+                "similarity": 0.95 - (i * 0.05),
+                "algorithm": "mock",
+                "name": f"Similar Product {i+1}"
+            }
+            for i in range(min(n, 10))
+        ]
     
     async def get_frequently_bought_together(
         self,
@@ -346,7 +405,7 @@ class RecommendationService:
             self.last_training = self.hybrid_engine.trained_at
             print("✅ Models loaded successfully")
         except Exception as e:
-            print(f"⚠️  Could not load models: {e}")
+            print(f"[WARNING] Could not load models: {e}")
             self.models_trained = False
 
 

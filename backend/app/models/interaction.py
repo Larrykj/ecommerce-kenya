@@ -5,7 +5,18 @@ For tracking user behavior and training ML models
 from typing import Optional
 from datetime import datetime
 from pydantic import BaseModel, Field
-from bson import ObjectId
+
+# Optional MongoDB import
+try:
+    from bson import ObjectId
+    BSON_AVAILABLE = True
+except ImportError:
+    BSON_AVAILABLE = False
+    class ObjectId:
+        @staticmethod
+        def __call__():
+            import uuid
+            return str(uuid.uuid4())
 
 
 class Interaction(BaseModel):

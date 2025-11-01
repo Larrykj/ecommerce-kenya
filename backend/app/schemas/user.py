@@ -19,8 +19,9 @@ class UserBase(BaseModel):
 
 class UserCreate(UserBase):
     """Schema for creating a new user"""
-    password: str = Field(..., min_length=8)
+    password: str = Field(..., min_length=6, description="Password must be at least 6 characters")
     mpesa_phone_number: Optional[str] = None
+    preferred_categories: Optional[List[str]] = None
 
 
 class UserUpdate(BaseModel):

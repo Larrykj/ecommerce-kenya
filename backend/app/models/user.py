@@ -4,10 +4,25 @@ User Database Model
 from typing import List, Optional
 from datetime import datetime
 from pydantic import BaseModel, EmailStr, Field
-from bson import ObjectId
+
+# Optional MongoDB import
+try:
+    from bson import ObjectId as BsonObjectId
+    BSON_AVAILABLE = True
+except ImportError:
+    BSON_AVAILABLE = False
+    class BsonObjectId:
+        @staticmethod
+        def is_valid(v):
+            return True
+        def __init__(self, *args, **kwargs):
+            import uuid
+            self._id = str(uuid.uuid4())
+        def __str__(self):
+            return self._id
 
 
-class PyObjectId(ObjectId):
+class PyObjectId(BsonObjectId):
     """Custom ObjectId type for Pydantic"""
     @classmethod
     def __get_validators__(cls):

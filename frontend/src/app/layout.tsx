@@ -12,11 +12,7 @@ export const metadata: Metadata = {
   description: 'AI-powered e-commerce platform with personalized recommendations for Kenyan shoppers',
   manifest: '/manifest.json',
   themeColor: '#22c55e',
-  viewport: 'width=device-width, initial-scale=1, maximum-scale=5',
-  icons: {
-    icon: '/icon-192x192.png',
-    apple: '/icon-192x192.png'
-  }
+  viewport: 'width=device-width, initial-scale=1, maximum-scale=5'
 }
 
 export default function RootLayout({
