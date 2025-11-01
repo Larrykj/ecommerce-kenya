@@ -2,8 +2,9 @@
 Configuration Settings
 Loads environment variables and application settings
 """
-from typing import List, Optional
+from typing import List, Optional, Union
 from pydantic_settings import BaseSettings
+import json
 
 
 class Settings(BaseSettings):
@@ -14,13 +15,21 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "E-Commerce Recommendation System Kenya"
     ENVIRONMENT: str = "development"
     
-    # CORS
-    BACKEND_CORS_ORIGINS: List[str] = [
-        "http://localhost:3000",
-        "http://localhost:3001",
-        "http://localhost:8000",
-        "http://localhost:8080"
-    ]
+    # CORS - Parse from JSON string or use defaults
+    BACKEND_CORS_ORIGINS: Union[List[str], str] = "*"  # Allow all origins for deployment flexibility
+    
+    @property
+    def cors_origins(self) -> List[str]:
+        """Parse CORS origins from environment variable or return defaults"""
+        if isinstance(self.BACKEND_CORS_ORIGINS, str):
+            if self.BACKEND_CORS_ORIGINS == "*":
+                return ["*"]  # Allow all origins
+            try:
+                return json.loads(self.BACKEND_CORS_ORIGINS)
+            except (json.JSONDecodeError, TypeError):
+                # If not JSON, split by comma
+                return [origin.strip() for origin in self.BACKEND_CORS_ORIGINS.split(",")]
+        return self.BACKEND_CORS_ORIGINS
     
     # Database
     MONGODB_URL: str = "mongodb://localhost:27017"

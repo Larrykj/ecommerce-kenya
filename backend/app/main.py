@@ -28,13 +28,24 @@ app = FastAPI(
 )
 
 # CORS Middleware - Allow frontend to communicate
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.BACKEND_CORS_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+cors_origins = settings.cors_origins
+if cors_origins == ["*"]:
+    # Allow all origins
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=False,  # Cannot use credentials with wildcard
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+else:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=cors_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 # GZip Middleware - Compress responses for low-bandwidth optimization
 app.add_middleware(GZipMiddleware, minimum_size=1000)
